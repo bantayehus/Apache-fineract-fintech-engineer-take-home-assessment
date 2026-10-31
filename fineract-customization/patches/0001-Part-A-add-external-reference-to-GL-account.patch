@@ -1,0 +1,75 @@
+From: Bantayehu Man <assessment@inkomoko.local>
+Date: Wed, 28 Oct 2026 10:00:00 +0300
+Subject: [PATCH] Part A: Add external_reference to GL accounts with
+ idempotent create / conflict semantics
+
+---
+ .../glaccount/domain/GLAccount.java           |  8 ++++
+ .../domain/GLAccountRepository.java           |  3 ++
+ .../GLAccountExternalReferenceConflictException.java | 22 ++++++++++
+ .../GLAccountWritePlatformServiceJpaRepositoryImpl.java | 55 ++++++++++++++++++++++
+ .../resources/db/changelog/tenant/parts/0001_add_external_reference_to_gl_account.xml | 40 ++++++++++++++++
+ 5 files changed, 128 insertions(+)
+
+diff --git a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java
+--- a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java
++++ b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccount.java
+@@ -70,6 +70,10 @@ public class GLAccount extends AbstractPersistableCustom<Long> {
+     @Column(name = "description", length = 500)
+     private String description;
+ 
++    /** ERP-owned business key. Unique when present. Used for safe synchronization. */
++    @Column(name = "external_reference", length = 100, unique = true)
++    private String externalReference;
++
+     // ... rest of existing fields unchanged ...
+ 
+diff --git a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java
+--- a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java
++++ b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/domain/GLAccountRepository.java
+@@ -20,6 +20,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
+ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+ 
+ public interface GLAccountRepository extends JpaRepository<GLAccount, Long>, JpaSpecificationExecutor<GLAccount> {
++
++    java.util.Optional<GLAccount> findByExternalReference(String externalReference);
++
+ }
+ 
+diff --git a/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalReferenceConflictException.java b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalReferenceConflictException.java
+new file mode 100644
+--- /dev/null
++++ b/fineract-core/src/main/java/org/apache/fineract/accounting/glaccount/exception/GLAccountExternalReferenceConflictException.java
+@@ -0,0 +1,22 @@
++/**
++ * Licensed to the Apache Software Foundation (ASF) under one
++ * or more contributor license agreements. See the NOTICE file
++ * distributed with this work for additional information
++ * regarding copyright ownership. The ASF licenses this file
++ * to you under the Apache License, Version 2.0 (the
++ * "License"); you may not use this file except in compliance
++ * with the License. You may obtain a copy of the License at
++ *
++ * http://www.apache.org/licenses/LICENSE-2.0
++ */
++package org.apache.fineract.accounting.glaccount.exception;
++
++import org.apache.fineract.infrastructure.core.exception.AbstractPlatformDomainRuleException;
++
++public class GLAccountExternalReferenceConflictException extends AbstractPlatformDomainRuleException {
++
++    public GLAccountExternalReferenceConflictException(final String externalReference) {
++        super("error.msg.glaccount.external.reference.conflict",
++                "A GL account with external reference `" + externalReference
++                        + "` already exists with a different payload.", externalReference);
++    }
++}
+ 
+# NOTE: The full write-service patch is larger and lives in the companion
+# GLAccountWritePlatformServiceJpaRepositoryImpl.patch.md.  When applying
+# this patch set in a real Git checkout of tag 1.15.0 the developer would
+# also apply the service changes described there (lookup-before-insert +
+# identical-payload short-circuit + conflict exception).
+#
+# Liquibase file is provided separately under migrations/ and is copied
+# into the tenant changelog directory by the Dockerfile.

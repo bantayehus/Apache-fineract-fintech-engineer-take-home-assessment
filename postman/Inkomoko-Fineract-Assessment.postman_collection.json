@@ -1,0 +1,313 @@
+{
+  "info": {
+    "name": "Inkomoko Fineract Assessment",
+    "description": "Integration Service + Mock ERP API collection for the Fintech Engineer take-home assessment.\n\nBase URLs (docker-compose):\n- Integration Service: http://localhost:8000\n- Mock ERP: http://localhost:8001\n\nAuth: Bearer assessment-secret-token\nAlways send X-Correlation-ID (or let the server generate one).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{auth_token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "integration_url", "value": "http://localhost:8000" },
+    { "key": "erp_url", "value": "http://localhost:8001" },
+    { "key": "auth_token", "value": "assessment-secret-token" },
+    { "key": "client_uid", "value": "SME-000001" },
+    { "key": "loan_reference", "value": "LN-2026-000001" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Integration health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{integration_url}}/health",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Mock ERP health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{erp_url}}/health",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "GL Account Sync (Part A)",
+      "item": [
+        {
+          "name": "Sync Bank 1100",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-gl-1100" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"GL-1100\",\n  \"code\": \"1100\",\n  \"name\": \"Bank\",\n  \"type\": \"ASSET\",\n  \"currency\": \"RWF\"\n}"
+            },
+            "url": "{{integration_url}}/api/accounts/sync"
+          }
+        },
+        {
+          "name": "Sync Loan Receivable 1200",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-gl-1200" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"GL-1200\",\n  \"code\": \"1200\",\n  \"name\": \"Loan Receivable\",\n  \"type\": \"ASSET\",\n  \"currency\": \"RWF\"\n}"
+            },
+            "url": "{{integration_url}}/api/accounts/sync"
+          }
+        },
+        {
+          "name": "Sync Interest Income 4000",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-gl-4000" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"GL-4000\",\n  \"code\": \"4000\",\n  \"name\": \"Interest Income\",\n  \"type\": \"INCOME\",\n  \"currency\": \"RWF\"\n}"
+            },
+            "url": "{{integration_url}}/api/accounts/sync"
+          }
+        },
+        {
+          "name": "Idempotent re-sync (same payload)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-gl-1200-idem" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"GL-1200\",\n  \"code\": \"1200\",\n  \"name\": \"Loan Receivable\",\n  \"type\": \"ASSET\",\n  \"currency\": \"RWF\"\n}"
+            },
+            "url": "{{integration_url}}/api/accounts/sync"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clients (Part C)",
+      "item": [
+        {
+          "name": "Create client",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-client-001" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"CLIENT-CREATE-001\",\n  \"client_uid\": \"SME-000001\",\n  \"firstname\": \"Acme\",\n  \"lastname\": \"Trading Ltd\"\n}"
+            },
+            "url": "{{integration_url}}/api/clients"
+          }
+        },
+        {
+          "name": "Get client by client_uid",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-ID", "value": "corr-client-get" }],
+            "url": "{{integration_url}}/api/clients/{{client_uid}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Loans (Parts D/E/F)",
+      "item": [
+        {
+          "name": "Create loan application",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-loan-app" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"LOAN-APP-001\",\n  \"loan_reference\": \"LN-2026-000001\",\n  \"client_uid\": \"SME-000001\",\n  \"product\": \"SME Asset Finance\",\n  \"principal\": 5000000,\n  \"currency\": \"RWF\",\n  \"term_months\": 12,\n  \"interest_rate\": 18.0,\n  \"auto_approve\": true\n}"
+            },
+            "url": "{{integration_url}}/api/loans"
+          }
+        },
+        {
+          "name": "Get loan",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-ID", "value": "corr-loan-get" }],
+            "url": "{{integration_url}}/api/loans/{{loan_reference}}"
+          }
+        },
+        {
+          "name": "Disburse loan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-disb-001" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"DISB-001\",\n  \"note\": \"Initial disbursement\"\n}"
+            },
+            "url": "{{integration_url}}/api/loans/{{loan_reference}}/disburse"
+          }
+        },
+        {
+          "name": "Disburse again (idempotent)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-disb-001-dup" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"DISB-001\",\n  \"note\": \"Initial disbursement\"\n}"
+            },
+            "url": "{{integration_url}}/api/loans/{{loan_reference}}/disburse"
+          }
+        },
+        {
+          "name": "Repayment 1 (partial)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-rep-001" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"REP-001\",\n  \"amount\": 500000,\n  \"note\": \"Partial repayment 1\"\n}"
+            },
+            "url": "{{integration_url}}/api/loans/{{loan_reference}}/repayments"
+          }
+        },
+        {
+          "name": "Repayment 2 (partial)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-rep-002" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"REP-002\",\n  \"amount\": 500000,\n  \"note\": \"Partial repayment 2\"\n}"
+            },
+            "url": "{{integration_url}}/api/loans/{{loan_reference}}/repayments"
+          }
+        },
+        {
+          "name": "Repayment 3 (partial)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-rep-003" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"REP-003\",\n  \"amount\": 500000,\n  \"note\": \"Partial repayment 3\"\n}"
+            },
+            "url": "{{integration_url}}/api/loans/{{loan_reference}}/repayments"
+          }
+        },
+        {
+          "name": "Final payoff",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-rep-final" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference\": \"REP-FINAL\",\n  \"amount\": 4000000,\n  \"note\": \"Final payoff\"\n}"
+            },
+            "url": "{{integration_url}}/api/loans/{{loan_reference}}/repayments"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions & Reconciliation",
+      "item": [
+        {
+          "name": "Get transaction DISB-001",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-ID", "value": "corr-txn-disb" }],
+            "url": "{{integration_url}}/api/transactions/DISB-001"
+          }
+        },
+        {
+          "name": "Get transaction REP-001",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Correlation-ID", "value": "corr-txn-rep" }],
+            "url": "{{integration_url}}/api/transactions/REP-001"
+          }
+        },
+        {
+          "name": "Run reconciliation",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Correlation-ID", "value": "corr-recon" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"references\": [\"DISB-001\", \"REP-001\", \"REP-002\", \"REP-003\", \"REP-FINAL\"]\n}"
+            },
+            "url": "{{integration_url}}/api/reconciliation"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mock ERP direct",
+      "item": [
+        {
+          "name": "List ERP accounts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{erp_url}}/api/accounts",
+            "auth": { "type": "noauth" }
+          }
+        },
+        {
+          "name": "Get journal entry DISB-001",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{erp_url}}/api/journal-entries/DISB-001",
+            "auth": { "type": "noauth" }
+          }
+        }
+      ]
+    }
+  ]
+}

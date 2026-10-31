@@ -1,0 +1,255 @@
+# services:
+#   mariadb-fineract:
+#     image: mariadb:11
+#     environment:
+#       MYSQL_ROOT_PASSWORD: fineract
+#       MYSQL_DATABASE: fineract_tenants
+#       MYSQL_USER: fineract
+#       MYSQL_PASSWORD: fineract
+#     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+#     volumes:
+#       - mariadb_fineract_data:/var/lib/mysql
+#     healthcheck:
+#       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 20
+#     ports:
+#       - "3306:3306"
+
+#   postgres-integration:
+#     image: postgres:16-alpine
+#     environment:
+#       POSTGRES_USER: integration
+#       POSTGRES_PASSWORD: integration
+#       POSTGRES_DB: integration
+#     volumes:
+#       - pg_integration_data:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U integration"]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 10
+#     ports:
+#       - "5433:5432"
+
+#   postgres-erp:
+#     image: postgres:16-alpine
+#     environment:
+#       POSTGRES_USER: erp
+#       POSTGRES_PASSWORD: erp
+#       POSTGRES_DB: erp
+#     volumes:
+#       - pg_erp_data:/var/lib/postgresql/data
+#     healthcheck:
+#       test: ["CMD-SHELL", "pg_isready -U erp"]
+#       interval: 5s
+#       timeout: 5s
+#       retries: 10
+#     ports:
+#       - "5434:5432"
+
+#   fineract:
+#     image: apache/fineract:latest
+#     depends_on:
+#       mariadb-fineract:
+#         condition: service_healthy
+#     environment:
+#       FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME: org.mariadb.jdbc.Driver
+#       FINERACT_HIKARI_JDBC_URL: jdbc:mariadb://mariadb-fineract:3306/fineract_tenants
+#       FINERACT_HIKARI_USERNAME: fineract
+#       FINERACT_HIKARI_PASSWORD: fineract
+#       FINERACT_DEFAULT_TENANTDB_HOSTNAME: mariadb-fineract
+#       FINERACT_DEFAULT_TENANTDB_PORT: 3306
+#       FINERACT_DEFAULT_TENANTDB_UID: fineract
+#       FINERACT_DEFAULT_TENANTDB_PWD: fineract
+#       FINERACT_DEFAULT_TENANTDB_NAME: fineract_default
+#       FINERACT_DEFAULT_TENANTDB_IDENTIFIER: default
+#       FINERACT_DEFAULT_TENANTDB_DESCRIPTION: Default Tenant
+#       JAVA_OPTS: "-Xmx1g"
+#     ports:
+#       - "8443:8443"
+#       - "8080:8080"
+#     healthcheck:
+#       test: ["CMD-SHELL", "curl -fk https://localhost:8443/fineract-provider/actuator/health || exit 1"]
+#       interval: 20s
+#       timeout: 10s
+#       retries: 40
+#       start_period: 300s
+
+#   mock-erp:
+#     build:
+#       context: ./mock-erp
+#       dockerfile: Dockerfile
+#     depends_on:
+#       postgres-erp:
+#         condition: service_healthy
+#     environment:
+#       DATABASE_URL: postgresql+asyncpg://erp:erp@postgres-erp:5432/erp
+#       LOG_LEVEL: INFO
+#     ports:
+#       - "8001:8000"
+#     healthcheck:
+#       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+
+#   integration-service:
+#     build:
+#       context: ./integration-service
+#       dockerfile: Dockerfile
+#     depends_on:
+#       postgres-integration:
+#         condition: service_healthy
+#       fineract:
+#         condition: service_healthy
+#       mock-erp:
+#         condition: service_healthy
+#     environment:
+#       DATABASE_URL: postgresql+asyncpg://integration:integration@postgres-integration:5432/integration
+#       FINERACT_BASE_URL: http://fineract:8080/fineract-provider/api/v1
+#       FINERACT_USERNAME: mifos
+#       FINERACT_PASSWORD: password
+#       ERP_BASE_URL: http://mock-erp:8000
+#       LOG_LEVEL: INFO
+#       AUTH_TOKEN: assessment-secret-token
+#     ports:
+#       - "8000:8000"
+#     healthcheck:
+#       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+
+# volumes:
+#   mariadb_fineract_data:
+#   pg_integration_data:
+#   pg_erp_data:
+
+services:
+  postgres-fineract:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: fineract
+      POSTGRES_PASSWORD: fineract
+      POSTGRES_DB: postgres
+    volumes:
+      - pg_fineract_data:/var/lib/postgresql/data
+      - ./fineract/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fineract"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    ports:
+      - "5432:5432"
+
+  postgres-integration:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: integration
+      POSTGRES_PASSWORD: integration
+      POSTGRES_DB: integration
+    volumes:
+      - pg_integration_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U integration"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5433:5432"
+
+  postgres-erp:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: erp
+      POSTGRES_DB: erp
+    volumes:
+      - pg_erp_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5434:5432"
+
+  fineract:
+    image: apache/fineract:latest
+    depends_on:
+      postgres-fineract:
+        condition: service_healthy
+    environment:
+      FINERACT_HIKARI_DRIVER_SOURCE_CLASS_NAME: org.postgresql.Driver
+      FINERACT_HIKARI_JDBC_URL: jdbc:postgresql://postgres-fineract:5432/fineract_tenants
+      FINERACT_HIKARI_USERNAME: fineract
+      FINERACT_HIKARI_PASSWORD: fineract
+      FINERACT_DEFAULT_TENANTDB_HOSTNAME: postgres-fineract
+      FINERACT_DEFAULT_TENANTDB_PORT: 5432
+      FINERACT_DEFAULT_TENANTDB_UID: fineract
+      FINERACT_DEFAULT_TENANTDB_PWD: fineract
+      FINERACT_DEFAULT_TENANTDB_NAME: fineract_default
+      FINERACT_DEFAULT_TENANTDB_IDENTIFIER: default
+      FINERACT_DEFAULT_TENANTDB_DESCRIPTION: Default Tenant
+      JAVA_OPTS: "-Xmx1g"
+    ports:
+      - "8443:8443"
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fk https://localhost:8443/fineract-provider/actuator/health || exit 1"]
+      interval: 20s
+      timeout: 15s
+      retries: 40
+      start_period: 300s
+
+  mock-erp:
+    build:
+      context: ./mock-erp
+      dockerfile: Dockerfile
+    depends_on:
+      postgres-erp:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://erp:erp@postgres-erp:5432/erp
+      LOG_LEVEL: INFO
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  integration-service:
+    build:
+      context: ./integration-service
+      dockerfile: Dockerfile
+    depends_on:
+      postgres-integration:
+        condition: service_healthy
+      mock-erp:
+        condition: service_healthy
+      # Do not require fineract healthy so stack still starts if Fineract is slow/fails
+    environment:
+      DATABASE_URL: postgresql+asyncpg://integration:integration@postgres-integration:5432/integration
+      FINERACT_BASE_URL: https://fineract:8443/fineract-provider/api/v1
+      FINERACT_USERNAME: mifos
+      FINERACT_PASSWORD: password
+      ERP_BASE_URL: http://mock-erp:8000
+      LOG_LEVEL: INFO
+      AUTH_TOKEN: assessment-secret-token
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_fineract_data:
+  pg_integration_data:
+  pg_erp_data:

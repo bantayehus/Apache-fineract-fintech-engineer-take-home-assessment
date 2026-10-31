@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Liquibase migration for Part A of the Inkomoko Fintech Engineer assessment.
+    Adds external_reference column to acc_gl_account so ERP-owned GL accounts
+    can be safely synchronized into Fineract with uniqueness and idempotency.
+-->
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="assessment-0001-add-external-reference-to-gl-account" author="bantayehu-inkomoko-assessment">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="acc_gl_account" columnName="external_reference"/>
+            </not>
+        </preConditions>
+
+        <comment>
+            Add external_reference (ERP business key) to GL accounts.
+            Must be unique when present. Used for idempotent create from Integration Service.
+        </comment>
+
+        <addColumn tableName="acc_gl_account">
+            <column name="external_reference" type="varchar(100)">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+
+        <!-- Unique constraint – only one GL account may own a given external_reference -->
+        <addUniqueConstraint
+                tableName="acc_gl_account"
+                columnNames="external_reference"
+                constraintName="uq_acc_gl_account_external_reference"/>
+
+        <rollback>
+            <dropUniqueConstraint tableName="acc_gl_account" constraintName="uq_acc_gl_account_external_reference"/>
+            <dropColumn tableName="acc_gl_account" columnName="external_reference"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
